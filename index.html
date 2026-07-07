@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UX Detective: Squad Mode</title>
+<style>
+  :root{
+    --bg-navy:#1a2230;
+    --panel:#1d242f;
+    --panel-2:#232b38;
+    --line:rgba(232,147,68,.22);
+    --line-soft:rgba(255,255,255,.08);
+    --accent:#ef9d3f;
+    --accent-2:#f7b45a;
+    --accent-deep:#d97b1e;
+    --cream:#ece2d4;
+    --muted:#9a8d7c;
+    --muted-2:#6f6456;
+    --red:#d6503f;
+    --green:#4bbf7b;
+    --blue:#6fb7d8;
+    --mono:'Courier New',ui-monospace,Menlo,Consolas,monospace;
+    --serif:Georgia,'Times New Roman',serif;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    /* magnifying-glass cursors */
+    --cur-mag:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Ccircle cx='13' cy='13' r='8.5' fill='rgba(239,157,63,0.12)' stroke='%23ef9d3f' stroke-width='2.5'/%3E%3Cline x1='19' y1='19' x2='29' y2='29' stroke='%23d97b1e' stroke-width='3.5' stroke-linecap='round'/%3E%3C/svg%3E") 13 13, auto;
+    --cur-mag-big:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'%3E%3Ccircle cx='18' cy='18' r='13' fill='rgba(239,157,63,0.16)' stroke='%23ef9d3f' stroke-width='3'/%3E%3Cline x1='27' y1='27' x2='45' y2='45' stroke='%23d97b1e' stroke-width='5' stroke-linecap='round'/%3E%3Cline x1='12' y1='18' x2='24' y2='18' stroke='%23ef9d3f' stroke-width='2.6'/%3E%3Cline x1='18' y1='12' x2='18' y2='24' stroke='%23ef9d3f' stroke-width='2.6'/%3E%3C/svg%3E") 18 18, text;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  /* magnifying glass as the cursor everywhere */
+  html,body,button,.btn,a,[onclick]{cursor:var(--cur-mag)}
+  /* bigger magnifier over any text box */
+  input,textarea,.field{cursor:var(--cur-mag-big)}
+  body{
+    font-family:var(--sans);
+    color:var(--cream);
+    background:
+      radial-gradient(1200px 700px at 18% 12%, rgba(60,44,30,.55), transparent 60%),
+      radial-gradient(900px 600px at 85% 80%, rgba(26,34,48,.55), transparent 55%),
+      linear-gradient(160deg,#171009,#0f0b08 60%,#0b0906);
+    min-height:100vh;overflow-x:hidden;
+  }
+  .dust{position:fixed;inset:0;pointer-events:none;z-index:0}
+  .dust span{position:absolute;width:3px;height:3px;border-radius:50%;background:rgba(232,170,90,.35);animation:float linear infinite}
+  @keyframes float{0%{transform:translateY(0);opacity:0}10%{opacity:.7}90%{opacity:.5}100%{transform:translateY(-100vh);opacity:0}}
+
+  .wrap{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:26px 22px 60px;min-height:100vh;transition:padding .3s}
+
+  .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;flex-wrap:wrap;gap:12px}
+  .stamp{font-family:var(--mono);font-size:12px;letter-spacing:3px;color:var(--red);
+    border:2px solid rgba(214,80,63,.6);padding:7px 14px;border-radius:6px;transform:rotate(-3deg);
+    text-transform:uppercase;background:rgba(214,80,63,.06);white-space:nowrap}
+  .brandline{font-family:var(--mono);font-size:11px;letter-spacing:2px;color:var(--muted-2);text-transform:uppercase}
+  .stepdots{display:flex;gap:7px;align-items:center}
+  .stepdots i{width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.12);display:block;transition:.3s}
+  .stepdots i.on{background:var(--accent);box-shadow:0 0 10px rgba(239,157,63,.7)}
+  .stepdots i.done{background:var(--accent-deep)}
+
+  .screen{display:none;animation:fade .5s ease}
+  .screen.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+  .panel{background:linear-gradient(180deg,rgba(35,43,56,.92),rgba(24,30,40,.92));
+    border:1px solid var(--line);border-radius:18px;padding:30px;
+    box-shadow:0 30px 70px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.03)}
+
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:3px;color:var(--accent);text-transform:uppercase;
+    display:flex;align-items:center;gap:9px;margin-bottom:14px}
+  .kicker .beacon{width:10px;height:10px;border-radius:50%;background:var(--blue);box-shadow:0 0 12px var(--blue);animation:pulse 1.6s infinite}
+  .kicker .beacon.g{background:var(--green);box-shadow:0 0 12px var(--green)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+  h1{font-family:var(--serif);font-weight:700;line-height:1.05;font-size:clamp(30px,4.6vw,54px);letter-spacing:-.5px}
+  h1 .accent{color:var(--accent)}
+  h2{font-family:var(--serif);font-weight:700;font-size:clamp(24px,3.2vw,36px);line-height:1.1}
+  .lead{color:var(--muted);font-size:15px;line-height:1.6;margin-top:10px;max-width:62ch}
+  .tw.typing{min-height:1.2em}
+  .caret{display:inline-block;width:8px;height:1.05em;background:var(--accent);margin-left:2px;vertical-align:-2px;animation:blink .8s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+
+  /* numbered step-by-step instructions */
+  .steps{list-style:none;counter-reset:s;display:grid;gap:9px;margin-top:16px}
+  .steps li{position:relative;padding:6px 0 6px 42px;font-size:13.5px;color:var(--muted);line-height:1.6;min-height:30px}
+  .steps li::before{counter-increment:s;content:counter(s);position:absolute;left:0;top:2px;width:28px;height:28px;border-radius:50%;
+    background:linear-gradient(180deg,var(--accent-2),var(--accent-deep));color:#241503;font-family:var(--mono);font-weight:700;font-size:13px;
+    display:flex;align-items:center;justify-content:center;box-shadow:0 4px 10px rgba(217,123,30,.3)}
+  .steps li b{color:var(--cream)}
+  .steps.blue li::before{background:linear-gradient(180deg,#8fd0ec,#4f9dc4);box-shadow:none}
+
+  .btn{font-family:var(--mono);font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:14px;
+    background:linear-gradient(180deg,var(--accent-2),var(--accent-deep));color:#241503;border:none;
+    padding:15px 26px;border-radius:12px;transition:.18s;box-shadow:0 10px 24px rgba(217,123,30,.32)}
+  .btn:hover{transform:translateY(-2px);box-shadow:0 14px 30px rgba(217,123,30,.45)}
+  .btn:active{transform:translateY(0)}
+  .btn:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none;filter:grayscale(.5)}
+  .btn.ghost{background:transparent;color:var(--cream);border:1px solid var(--line);box-shadow:none}
+  .btn.ghost:hover{border-color:var(--accent);color:var(--accent)}
+  .btn.sm{padding:10px 16px;font-size:12px}
+
+  .field{width:100%;background:rgba(0,0,0,.28);border:1px solid var(--line-soft);border-radius:10px;
+    color:var(--cream);font-family:var(--mono);font-size:15px;padding:13px 14px;transition:.18s}
+  .field:hover{transform:scale(1.02)}
+  .field:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(239,157,63,.14);transform:scale(1.02)}
+  .field::placeholder{color:var(--muted-2)}
+
+  .link{background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:12px;text-decoration:underline;text-underline-offset:3px}
+  .link:hover{color:var(--accent)}
+
+  .foot{margin-top:22px;padding-top:16px;border-top:1px solid var(--line-soft);
+    display:flex;align-items:center;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--muted-2);letter-spacing:1px;flex-wrap:wrap;gap:10px}
+
+  /* SCREEN 1 */
+  .hero{display:grid;grid-template-columns:1fr 1.15fr;gap:26px;align-items:stretch}
+  .hero-art{background:linear-gradient(180deg,rgba(20,26,34,.5),rgba(12,16,22,.5));border:1px solid var(--line);
+    border-radius:18px;display:flex;align-items:flex-end;justify-content:center;overflow:hidden;min-height:380px;position:relative}
+  .hero-art img{width:100%;max-width:320px;object-fit:contain;filter:drop-shadow(0 24px 44px rgba(0,0,0,.7))}
+  .hero-art::after{content:"";position:absolute;inset:0;background:radial-gradient(280px 200px at 50% 40%, rgba(239,157,63,.16), transparent 70%);pointer-events:none}
+  .dialog{background:rgba(0,0,0,.24);border-left:3px solid var(--accent);border-radius:0 10px 10px 0;
+    padding:14px 18px;font-family:var(--mono);font-size:14px;line-height:1.6;color:var(--cream);margin:16px 0}
+
+  /* ROLE CARDS */
+  .roles{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:22px}
+  .role-card{background:var(--panel);border:1px solid var(--line-soft);border-radius:16px;padding:20px;transition:.2s;position:relative}
+  .role-card:hover{transform:scale(1.04);z-index:2;box-shadow:0 18px 40px rgba(0,0,0,.5);border-color:var(--accent)}
+  .role-card:focus-within,.role-card.filled{border-color:var(--accent)}
+  .role-badge{width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:26px;
+    background:linear-gradient(180deg,rgba(239,157,63,.2),rgba(217,123,30,.08));border:1px solid var(--line);margin-bottom:12px}
+  .role-name{font-family:var(--serif);font-size:21px;font-weight:700}
+  .role-job{color:var(--accent);font-family:var(--mono);font-size:12px;letter-spacing:1px;text-transform:uppercase;margin:4px 0 12px}
+  .role-desc{color:var(--muted);font-size:13px;line-height:1.5;margin-bottom:14px}
+  .role-in-label{font-family:var(--mono);font-size:11px;color:var(--muted-2);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;display:block}
+  .drives{margin-top:10px;font-family:var(--mono);font-size:11px;color:var(--accent-2);background:rgba(239,157,63,.08);border:1px dashed var(--line);border-radius:8px;padding:7px 9px;line-height:1.4}
+
+  /* CASE CARDS */
+  .cases{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:20px}
+  .case-card{background:var(--panel);border:1px solid var(--line-soft);border-radius:16px;padding:20px;transition:.2s;position:relative;display:flex;flex-direction:column}
+  .case-card:hover{transform:scale(1.04);z-index:2;border-color:var(--accent);box-shadow:0 18px 40px rgba(0,0,0,.5)}
+  .case-card.picked{border-color:var(--green);box-shadow:0 0 0 2px rgba(75,191,123,.4),0 14px 34px rgba(0,0,0,.4)}
+  .case-card.dim{opacity:.35;filter:grayscale(.6);pointer-events:none}
+  .case-title{font-family:var(--serif);font-size:20px;font-weight:700;margin-bottom:8px}
+  .case-body{color:var(--muted);font-size:13.5px;line-height:1.55;flex:1}
+  .case-mission{margin:12px 0;color:var(--cream);font-size:13px;line-height:1.5;background:rgba(0,0,0,.25);border-radius:10px;padding:10px 12px;border-left:2px solid var(--accent)}
+  .crimechips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+  .chip{font-family:var(--mono);font-size:10px;letter-spacing:.5px;color:var(--accent-2);background:rgba(239,157,63,.1);border:1px solid var(--line);border-radius:20px;padding:4px 9px;text-transform:uppercase}
+  .pick-mark{position:absolute;top:14px;right:14px;width:28px;height:28px;border-radius:50%;background:var(--green);color:#06210f;display:none;align-items:center;justify-content:center;font-weight:900;font-size:16px}
+  .case-card.picked .pick-mark{display:flex}
+  .case-art{display:flex;justify-content:center;margin:16px 0 4px}
+  .case-art img{width:180px;filter:drop-shadow(0 16px 30px rgba(0,0,0,.6))}
+
+  /* CRIME BRIEFING */
+  .brief-head{display:grid;grid-template-columns:1fr 200px;gap:20px;align-items:center}
+  .brief-head img{width:100%;max-width:200px;filter:drop-shadow(0 18px 34px rgba(0,0,0,.6))}
+  .crimegrid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:18px}
+  .crime-tile{background:var(--panel);border:1px solid var(--line-soft);border-radius:14px;padding:16px;transition:.2s}
+  .crime-tile:hover{transform:scale(1.025);z-index:2;box-shadow:0 14px 30px rgba(0,0,0,.45)}
+  .crime-tile.high{border-color:rgba(214,80,63,.6);box-shadow:inset 0 0 0 1px rgba(214,80,63,.15)}
+  .crime-tile.medium{border-color:rgba(239,157,63,.5)}
+  .crime-tile.low{border-color:rgba(75,191,123,.4)}
+  .crime-head{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .crime-num{font-family:var(--mono);font-size:11px;color:var(--muted-2);border:1px solid var(--line-soft);border-radius:6px;padding:2px 7px}
+  .crime-title{font-family:var(--serif);font-size:18px;font-weight:700}
+  .crime-mean{color:var(--muted);font-size:12.5px;line-height:1.5;margin-bottom:12px}
+  .crime-ex{color:var(--muted-2);font-size:11.5px;font-style:italic;line-height:1.45;margin-bottom:12px}
+  .risk-row{display:flex;gap:8px}
+  .risk-btn{flex:1;font-family:var(--mono);font-size:11px;letter-spacing:.5px;text-transform:uppercase;background:rgba(0,0,0,.25);border:1px solid var(--line-soft);color:var(--muted);border-radius:8px;padding:8px;transition:.15s}
+  .risk-btn:hover{border-color:var(--accent)}
+  .risk-btn.sel-high{background:rgba(214,80,63,.85);color:#fff;border-color:transparent}
+  .risk-btn.sel-medium{background:rgba(239,157,63,.9);color:#241503;border-color:transparent}
+  .risk-btn.sel-low{background:rgba(75,191,123,.85);color:#06210f;border-color:transparent}
+  .prevent{margin-top:10px;display:none}
+  .crime-tile.high .prevent{display:block}
+  .prevent label{font-family:var(--mono);font-size:10px;color:var(--red);letter-spacing:1px;text-transform:uppercase;display:block;margin-bottom:5px}
+  .brief-hint{margin-top:14px;font-family:var(--mono);font-size:12px;color:var(--blue);background:rgba(111,183,216,.06);border:1px solid rgba(111,183,216,.25);border-radius:10px;padding:12px 14px;line-height:1.5}
+
+  /* STUDIO / BUILDER */
+  .studio{display:grid;grid-template-columns:210px 1fr 300px;gap:16px;margin-top:16px;align-items:start}
+  .zone{background:var(--panel);border:1px solid var(--line-soft);border-radius:14px;padding:14px}
+  .zone h4{font-family:var(--mono);font-size:11px;letter-spacing:2px;color:var(--accent);text-transform:uppercase;margin-bottom:12px}
+  .tray-cat{font-family:var(--mono);font-size:9px;letter-spacing:1px;color:var(--muted-2);text-transform:uppercase;margin:12px 0 6px}
+  .tray-cat:first-child{margin-top:0}
+  .tray{display:flex;flex-direction:column;gap:7px;max-height:600px;overflow-y:auto;padding-right:4px}
+  .tray-item{display:flex;align-items:center;gap:9px;background:rgba(0,0,0,.28);border:1px solid var(--line-soft);border-radius:9px;padding:8px 10px;cursor:grab;font-size:12.5px;transition:.13s;user-select:none}
+  .tray-item:hover{border-color:var(--accent);background:rgba(239,157,63,.08);transform:scale(1.05)}
+  .tray-item:active{cursor:grabbing}
+  .tray-item .ic{font-size:15px;width:18px;text-align:center}
+
+  .phone-wrap{display:flex;flex-direction:column;align-items:center}
+  .phone{width:280px;background:#0c1016;border:8px solid #05070a;border-radius:34px;padding:14px 12px;min-height:520px;box-shadow:0 24px 60px rgba(0,0,0,.55);position:relative}
+  .phone .notch{width:110px;height:22px;background:#05070a;border-radius:0 0 14px 14px;margin:-14px auto 12px}
+  .dropzone{min-height:440px;display:flex;flex-direction:column;gap:10px;padding:4px;border-radius:14px;transition:.15s}
+  .dropzone.over{background:rgba(239,157,63,.08);outline:2px dashed var(--accent)}
+  .empty-hint{color:var(--muted-2);text-align:center;font-family:var(--mono);font-size:12px;padding:60px 16px;line-height:1.6}
+
+  .comp{position:relative;border-radius:10px;animation:pop .25s ease}
+  .comp.dragging{opacity:.4}
+  .comp.insert-before{box-shadow:0 -3px 0 var(--accent)}
+  @keyframes pop{from{transform:scale(.85);opacity:0}to{transform:scale(1);opacity:1}}
+  .comp .ctrls{position:absolute;top:-11px;right:-6px;display:none;gap:4px;z-index:4}
+  .comp:hover .ctrls{display:flex}
+  .comp .ctrls button{width:23px;height:23px;border-radius:6px;border:1px solid var(--line);background:var(--panel-2);color:var(--cream);cursor:pointer;font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center}
+  .comp .ctrls button:hover{border-color:var(--accent)}
+  .comp .ctrls .rm{background:var(--red);border-color:transparent;color:#fff}
+  .comp .move{position:absolute;top:-11px;left:-6px;width:23px;height:23px;border-radius:6px;background:var(--accent);color:#241503;border:none;cursor:grab;font-size:12px;line-height:23px;text-align:center;display:none;z-index:4}
+  .comp:hover .move{display:block}
+
+  /* component templates */
+  .c-header{background:#05070a;color:var(--cream);text-align:center;padding:11px;border-radius:8px;font-weight:700;font-size:14px}
+  .c-text{color:var(--cream);font-size:16px;font-weight:700;padding:4px 2px}
+  .c-para{color:var(--muted);font-size:12.5px;line-height:1.5;padding:2px}
+  .c-button{background:linear-gradient(180deg,var(--accent-2),var(--accent-deep));color:#241503;text-align:center;padding:12px;border-radius:10px;font-weight:700;font-size:14px}
+  .c-back{color:var(--blue);font-size:13px;padding:6px 2px;font-family:var(--mono)}
+  .c-link{color:var(--blue);font-size:13px;text-decoration:underline;padding:4px 2px}
+  .c-input{background:#fff;color:#555;border-radius:8px;padding:11px;font-size:13px}
+  .c-search{background:#fff;color:#777;border-radius:20px;padding:10px 14px;font-size:13px}
+  .c-dropdown{background:#fff;color:#333;border-radius:8px;padding:11px;font-size:13px;display:flex;justify-content:space-between}
+  .c-check,.c-radio{display:flex;align-items:center;gap:9px;color:var(--cream);font-size:13px;padding:5px 2px}
+  .c-check i{width:18px;height:18px;border-radius:5px;background:var(--green);color:#06210f;display:flex;align-items:center;justify-content:center;font-size:12px;font-style:normal}
+  .c-radio i{width:16px;height:16px;border-radius:50%;border:2px solid var(--accent);position:relative;flex:none}
+  .c-radio i::after{content:"";position:absolute;inset:3px;border-radius:50%;background:var(--accent)}
+  .c-toggle{display:flex;justify-content:space-between;align-items:center;color:var(--cream);font-size:13px;padding:5px 2px}
+  .c-toggle b{width:38px;height:22px;border-radius:20px;background:var(--green);position:relative;display:block;flex:none}
+  .c-toggle b::after{content:"";position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:#fff}
+  .c-qty{display:flex;align-items:center;gap:14px;justify-content:center;padding:6px}
+  .c-qty b{width:30px;height:30px;border-radius:8px;background:var(--accent);color:#241503;display:flex;align-items:center;justify-content:center;font-size:17px}
+  .c-qty span{font-size:15px;color:var(--cream);min-width:20px;text-align:center}
+  .c-rating{color:var(--accent);font-size:20px;letter-spacing:3px;padding:2px}
+  .c-success{background:rgba(75,191,123,.16);border:1px solid var(--green);color:#a7e8c2;border-radius:9px;padding:11px;font-size:13px;display:flex;gap:8px;align-items:center}
+  .c-error{background:rgba(214,80,63,.16);border:1px solid var(--red);color:#f0b3aa;border-radius:9px;padding:11px;font-size:13px}
+  .c-error small{display:block;color:#e88a7d;margin-top:3px;font-size:11px}
+  .c-banner{background:rgba(111,183,216,.14);border:1px solid rgba(111,183,216,.4);color:#bfe3f2;border-radius:9px;padding:10px;font-size:12.5px}
+  .c-progress{padding:6px 2px}
+  .c-progress .bar{height:8px;background:rgba(255,255,255,.12);border-radius:6px;overflow:hidden}
+  .c-progress .bar i{display:block;height:100%;width:60%;background:var(--accent);border-radius:6px}
+  .c-progress span{font-family:var(--mono);font-size:10px;color:var(--muted);display:block;margin-top:4px}
+  .c-steps{display:flex;gap:8px;justify-content:center;padding:6px}
+  .c-steps b{width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.12);color:var(--muted);display:flex;align-items:center;justify-content:center;font-size:12px}
+  .c-steps b.on{background:var(--accent);color:#241503}
+  .c-spin{display:flex;align-items:center;gap:9px;color:var(--muted);font-size:13px;padding:6px}
+  .c-spin i{width:16px;height:16px;border:3px solid rgba(255,255,255,.2);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;flex:none}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .c-icon{font-size:26px;text-align:center;padding:6px}
+  .c-card{background:rgba(255,255,255,.06);border:1px solid var(--line-soft);border-radius:10px;padding:12px;font-size:13px;color:var(--cream)}
+  .c-card b{display:block;margin-bottom:4px}
+  .c-list{display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.05);border-radius:8px;padding:11px;color:var(--cream);font-size:13px}
+  .c-list i{color:var(--muted);font-style:normal}
+  .c-avatar{display:flex;align-items:center;gap:10px;color:var(--cream);font-size:13px;padding:4px}
+  .c-avatar b{width:34px;height:34px;border-radius:50%;background:var(--panel-2);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:400;flex:none}
+  .c-badgewrap{position:relative;font-size:24px;padding:6px;width:fit-content}
+  .c-badge{position:absolute;top:2px;right:-6px;background:var(--red);color:#fff;font-size:10px;border-radius:20px;padding:1px 6px}
+  .c-price{color:var(--green);font-weight:700;font-size:19px;padding:2px}
+  .c-chip{display:inline-block;background:rgba(239,157,63,.15);border:1px solid var(--line);color:var(--accent-2);border-radius:20px;padding:5px 12px;font-size:12px}
+  .c-menu{display:flex;gap:6px;flex-wrap:wrap}
+  .c-menu span{background:rgba(255,255,255,.08);border-radius:6px;padding:6px 10px;font-size:11px;color:var(--cream)}
+  .c-tabbar{display:flex;justify-content:space-around;background:#05070a;border-radius:10px;padding:11px;font-size:18px}
+  .c-popup{background:#fff;color:#222;border-radius:12px;padding:14px;text-align:center;font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+  .c-popup .pbtns{display:flex;gap:8px;margin-top:10px}
+  .c-popup .pbtns b{flex:1;background:var(--accent-deep);color:#fff;border-radius:7px;padding:7px;font-size:12px}
+  .c-popup .pbtns b.sec{background:#eee;color:#333}
+  .c-divider{height:1px;background:var(--line-soft);margin:6px 0}
+  .c-image{background:repeating-linear-gradient(45deg,rgba(255,255,255,.05),rgba(255,255,255,.05) 10px,rgba(255,255,255,.02) 10px,rgba(255,255,255,.02) 20px);border:1px dashed var(--line-soft);border-radius:10px;height:90px;display:flex;align-items:center;justify-content:center;color:var(--muted-2);font-size:12px}
+
+  .prompt-box textarea{width:100%;min-height:78px;resize:vertical;background:rgba(0,0,0,.28);border:1px solid var(--line-soft);border-radius:10px;color:var(--cream);font-family:var(--mono);font-size:13px;padding:11px}
+  .prompt-box textarea:focus{outline:none;border-color:var(--accent)}
+  .promptlog{margin-top:10px;font-family:var(--mono);font-size:11px;color:var(--muted);max-height:110px;overflow-y:auto;line-height:1.6}
+  .promptlog .ok{color:var(--green)}
+  .promptlog .no{color:var(--accent-2)}
+  .ex-chips{margin-top:12px;display:flex;flex-wrap:wrap;gap:6px}
+  .ex-chips .exc{font-family:var(--mono);font-size:10.5px;color:var(--blue);background:rgba(111,183,216,.08);border:1px solid rgba(111,183,216,.25);border-radius:20px;padding:5px 9px;transition:.13s}
+  .ex-chips .exc:hover{background:rgba(111,183,216,.18);transform:scale(1.05)}
+
+  /* mission timer / hourglass */
+  .mission-overlay{position:fixed;inset:0;z-index:70;background:rgba(8,6,4,.9);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;text-align:center;animation:fade .4s;padding:20px}
+  .mission-overlay.show{display:flex}
+  .mission-card{max-width:460px;padding:20px}
+  .mission-card .kicker{justify-content:center}
+  .mission-card h2{margin:8px 0 6px}
+  .mission-card p{color:var(--muted);font-size:14px;line-height:1.6;margin-bottom:14px}
+  .hourglass-timer{font-family:var(--mono);font-size:40px;color:var(--accent);letter-spacing:2px;font-weight:700;margin-top:10px}
+  .sandclock{width:110px;height:150px;margin:0 auto}
+  .hg-frame{fill:none;stroke:var(--accent);stroke-width:5;stroke-linecap:round}
+  .sand{fill:var(--accent-2)}
+  .studio-timer{display:flex;align-items:center;gap:12px;background:rgba(0,0,0,.3);border:1px solid var(--line);border-radius:12px;padding:10px 16px;font-family:var(--mono)}
+  .studio-timer .mini-hg{width:26px;height:34px}
+  .studio-timer .t{font-size:22px;font-weight:700;color:var(--accent)}
+  .studio-timer .t.warn{color:var(--red);animation:pulse 1s infinite}
+  .studio-timer small{color:var(--muted);font-size:11px;letter-spacing:1px}
+
+  /* PINNED CRIME RAIL */
+  .crime-rail{position:fixed;top:76px;right:12px;width:190px;max-height:calc(100vh - 100px);overflow:auto;
+    background:linear-gradient(180deg,rgba(35,43,56,.97),rgba(22,28,38,.97));border:1px solid var(--line);border-radius:14px;padding:14px;z-index:45;display:none;box-shadow:0 20px 50px rgba(0,0,0,.55)}
+  body.rail-on .crime-rail{display:block}
+  .crime-rail .rt{font-family:var(--mono);font-size:11px;letter-spacing:1px;color:var(--red);text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+  .rail-chip{display:flex;gap:8px;align-items:center;background:rgba(0,0,0,.25);border:1px solid var(--line-soft);border-radius:9px;padding:8px 9px;margin-bottom:6px;font-size:11.5px;transition:.13s;line-height:1.25}
+  .rail-chip:hover{border-color:var(--accent);transform:scale(1.05);background:rgba(239,157,63,.08)}
+  .rail-chip.high{border-color:rgba(214,80,63,.55)}
+  .rail-chip .n{font-family:var(--mono);color:var(--muted-2);font-size:10px;flex:none}
+  .rail-hint{font-size:10px;color:var(--muted-2);text-align:center;margin-top:6px;font-family:var(--mono)}
+  .crime-fab{position:fixed;bottom:20px;right:20px;width:56px;height:56px;border-radius:50%;background:linear-gradient(180deg,var(--accent-2),var(--accent-deep));color:#241503;border:none;font-size:24px;z-index:45;display:none;box-shadow:0 10px 26px rgba(217,123,30,.55)}
+  @media(min-width:1180px){ body.rail-on .wrap{padding-right:212px} }
+  @media(max-width:1179px){ .crime-rail{display:none!important} body.rail-on .crime-fab{display:block} }
+
+  /* MODAL */
+  .modal-back{position:fixed;inset:0;background:rgba(6,5,3,.82);backdrop-filter:blur(4px);z-index:80;display:none;align-items:center;justify-content:center;padding:20px}
+  .modal-back.show{display:flex}
+  .modal{max-width:460px;width:100%;background:linear-gradient(180deg,rgba(35,43,56,.98),rgba(22,28,38,.98));border:1px solid var(--line);border-radius:16px;padding:26px;position:relative;box-shadow:0 30px 70px rgba(0,0,0,.6);animation:fade .3s}
+  .modal .x{position:absolute;top:12px;right:12px;width:30px;height:30px;border-radius:8px;background:rgba(0,0,0,.3);border:1px solid var(--line-soft);color:var(--cream);font-size:16px}
+  .modal .x:hover{border-color:var(--accent)}
+  .modal .mtag{font-family:var(--mono);font-size:11px;letter-spacing:1px;color:var(--accent);text-transform:uppercase;margin-bottom:6px}
+  .modal h3{font-family:var(--serif);font-size:26px;margin-bottom:10px}
+  .modal .mrow{font-size:13.5px;color:var(--muted);line-height:1.6;margin-bottom:10px}
+  .modal .mrow b{color:var(--cream)}
+  .modal .mex{background:rgba(0,0,0,.25);border-left:2px solid var(--accent);border-radius:0 8px 8px 0;padding:10px 12px;font-size:12.5px;color:var(--muted);font-style:italic;line-height:1.5}
+  .modal .mrisk{display:inline-block;margin-top:12px;font-family:var(--mono);font-size:11px;letter-spacing:1px;text-transform:uppercase;border-radius:20px;padding:4px 12px}
+  .mrisk.high{background:rgba(214,80,63,.85);color:#fff}.mrisk.medium{background:rgba(239,157,63,.9);color:#241503}.mrisk.low{background:rgba(75,191,123,.85);color:#06210f}.mrisk.none{background:rgba(255,255,255,.1);color:var(--muted)}
+
+  /* AUDIT */
+  .audit{display:grid;grid-template-columns:300px 1fr;gap:18px;margin-top:18px;align-items:start}
+  .audit-list{display:flex;flex-direction:column;gap:10px}
+  .audit-row{background:var(--panel);border:1px solid var(--line-soft);border-radius:12px;padding:14px;transition:.2s}
+  .audit-row:hover{transform:scale(1.015)}
+  .audit-row.flagged{border-color:rgba(214,80,63,.6)}
+  .audit-row .ah{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+  .audit-row .ah .crime-title{font-size:16px}
+  .predicted{font-family:var(--mono);font-size:9px;letter-spacing:.5px;background:var(--red);color:#fff;padding:2px 6px;border-radius:5px;text-transform:uppercase}
+  .audit-row .am{color:var(--muted);font-size:12px;line-height:1.5;margin-bottom:10px}
+  .verdict-row{display:flex;gap:8px;margin-bottom:8px}
+  .vbtn{flex:1;font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.5px;border:1px solid var(--line-soft);background:rgba(0,0,0,.25);color:var(--muted);border-radius:8px;padding:8px;transition:.15s}
+  .vbtn.sel-avoided{background:var(--green);color:#06210f;border-color:transparent}
+  .vbtn.sel-committed{background:var(--red);color:#fff;border-color:transparent}
+  .counter{position:sticky;top:16px;background:linear-gradient(180deg,rgba(35,43,56,.95),rgba(24,30,40,.95));border:1px solid var(--line);border-radius:16px;padding:22px;text-align:center}
+  .counter .big{font-family:var(--serif);font-size:60px;font-weight:700;color:var(--green)}
+  .counter .big span{color:var(--muted-2);font-size:34px}
+  .counter .lbl{font-family:var(--mono);font-size:11px;letter-spacing:2px;color:var(--muted);text-transform:uppercase}
+  .counter img{width:150px;margin:14px auto 0;display:block;filter:drop-shadow(0 14px 26px rgba(0,0,0,.55))}
+
+  /* REPORT */
+  .report{background:linear-gradient(180deg,rgba(35,43,56,.96),rgba(22,28,38,.96));border:1px solid var(--line);border-radius:18px;padding:30px;position:relative;overflow:hidden}
+  .report::before{content:"";position:absolute;top:-40px;right:-40px;width:200px;height:200px;background:radial-gradient(circle,rgba(239,157,63,.18),transparent 70%)}
+  .rc-top{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;position:relative}
+  .tier{font-family:var(--serif);font-size:34px;font-weight:700}
+  .tier.master{color:var(--accent)}.tier.pro{color:var(--green)}.tier.junior{color:var(--blue)}.tier.back{color:var(--red)}
+  .rc-score{font-family:var(--serif);font-size:52px;font-weight:700;color:var(--green);text-align:right}
+  .rc-score span{color:var(--muted-2);font-size:30px}
+  .team{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0}
+  .team .p{background:rgba(0,0,0,.25);border:1px solid var(--line-soft);border-radius:10px;padding:9px 13px;font-size:13px}
+  .team .p b{color:var(--accent);font-family:var(--mono);font-size:10px;letter-spacing:1px;display:block;text-transform:uppercase}
+  .skills{display:grid;gap:12px;margin-top:20px}
+  .skill-row{display:grid;grid-template-columns:150px 1fr auto;gap:14px;align-items:center;background:rgba(0,0,0,.2);border:1px solid var(--line-soft);border-radius:12px;padding:12px 16px}
+  .skill-name{font-weight:700;font-size:14px}
+  .skill-name small{display:block;color:var(--muted);font-size:11px;font-weight:400;margin-top:2px}
+  .stars{display:flex;gap:5px}
+  .star{font-size:22px;color:rgba(255,255,255,.15);transition:.12s}
+  .star.on{color:var(--accent);text-shadow:0 0 10px rgba(239,157,63,.5)}
+  .star:hover{transform:scale(1.15)}
+  .auto-tag{font-family:var(--mono);font-size:9px;color:var(--muted-2);letter-spacing:1px;text-transform:uppercase}
+
+  /* DEBRIEF */
+  .debrief-prompts{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:24px}
+  .dp{background:var(--panel);border:1px solid var(--line-soft);border-radius:14px;padding:18px;transition:.2s}
+  .dp:hover{transform:scale(1.03);border-color:var(--accent)}
+  .dp .who{font-family:var(--mono);font-size:11px;letter-spacing:1px;color:var(--accent);text-transform:uppercase;margin-bottom:8px}
+  .dp .q{font-family:var(--serif);font-size:17px;line-height:1.35;color:var(--cream)}
+  .dp .nm{color:var(--muted);font-size:12px;margin-top:8px}
+
+  .row-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:24px}
+  .split{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+
+  @media (max-width:900px){
+    .hero,.brief-head{grid-template-columns:1fr}
+    .roles,.cases{grid-template-columns:1fr}
+    .crimegrid{grid-template-columns:1fr}
+    .studio{grid-template-columns:1fr}
+    .audit{grid-template-columns:1fr}
+    .debrief-prompts{grid-template-columns:1fr}
+    .skill-row{grid-template-columns:1fr;gap:8px}
+    .tray{flex-direction:row;flex-wrap:wrap;max-height:none}
+    .tray-item{flex:1;min-width:130px}
+    .tray-cat{width:100%}
+  }
+</style>
+</head>
+<body>
+<div class="dust" id="dust"></div>
+
+<div class="wrap">
+  <div class="topbar">
+    <div class="stamp">Mission 3.B &middot; Classified</div>
+    <div class="stepdots" id="dots"></div>
+    <div class="brandline">Swift AI &middot; UX Investigations Unit</div>
+  </div>
+
+  <!-- ============ SCREEN 1 ============ -->
+  <section class="screen active" data-screen="1">
+    <div class="panel">
+      <div class="hero">
+        <div class="hero-art"><img src="Assets/detective%20svg.svg" alt="Detective"></div>
+        <div>
+          <div class="kicker"><span class="beacon"></span><span class="beacon g"></span> Case File Unsealed</div>
+          <h1>UX Detective: <span class="accent">Squad Mode</span></h1>
+          <div class="dialog tw">You've caught the criminals. Now the hard part: <b>build something that commits zero crimes.</b></div>
+          <ol class="steps">
+            <li><b>Assemble</b> your squad of 3 &mdash; pick your roles.</li>
+            <li><b>Pick a case</b> &mdash; one real school problem.</li>
+            <li><b>Predict</b> which UX crimes threaten it.</li>
+            <li><b>Build</b> the UI against the clock.</li>
+            <li><b>Audit</b> &amp; get your studio verdict.</li>
+          </ol>
+          <div class="row-actions">
+            <button class="btn" onclick="go(2)">Enter the Studio &rarr;</button>
+          </div>
+          <div class="foot">
+            <span>File No. 003-B &middot; Squad Edition</span>
+            <button class="link" onclick="resetAll()">Clear saved progress &rarr;</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SCREEN 2 ============ -->
+  <section class="screen" data-screen="2">
+    <div class="panel">
+      <div class="kicker"><span class="beacon"></span> Step 1 &middot; Assemble the Squad</div>
+      <h2>Pick Your Roles</h2>
+      <p class="lead tw">One role each, kept all game. Type each name to continue.</p>
+
+      <div class="roles" id="roleCards">
+        <div class="role-card" data-role="lead">
+          <div class="role-badge">&#128373;&#65039;</div>
+          <div class="role-name">Product Lead</div>
+          <div class="role-job">Runs the clock</div>
+          <div class="role-desc">Keeps time and forces the group to decide.</div>
+          <label class="role-in-label">Who is this?</label>
+          <input class="field name-in" data-key="lead" placeholder="Enter name&hellip;">
+        </div>
+        <div class="role-card" data-role="designer">
+          <div class="role-badge">&#127912;</div>
+          <div class="role-name">Designer</div>
+          <div class="role-job">Builds the UI</div>
+          <div class="role-desc">Turns group decisions into the design.</div>
+          <label class="role-in-label">Who is this?</label>
+          <input class="field name-in" data-key="designer" placeholder="Enter name&hellip;">
+          <div class="drives">&#9000; Only this person drives the keyboard.</div>
+        </div>
+        <div class="role-card" data-role="critic">
+          <div class="role-badge">&#128269;</div>
+          <div class="role-name">Critic</div>
+          <div class="role-job">Hunts UX crimes</div>
+          <div class="role-desc">Plays a confused first-time user.</div>
+          <label class="role-in-label">Who is this?</label>
+          <input class="field name-in" data-key="critic" placeholder="Enter name&hellip;">
+        </div>
+      </div>
+
+      <ol class="steps blue">
+        <li><b>Product Lead</b> reads their role aloud first.</li>
+        <li><b>Designer</b> then <b>Critic</b> read theirs in their own words.</li>
+        <li>Type all three names &rarr; lock the squad.</li>
+      </ol>
+
+      <div class="row-actions">
+        <button class="btn ghost" onclick="go(1)">&larr; Back</button>
+        <button class="btn" id="rolesNext" disabled onclick="go(3)">Lock the Squad &rarr;</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SCREEN 3 ============ -->
+  <section class="screen" data-screen="3">
+    <div class="panel">
+      <div class="split">
+        <div>
+          <div class="kicker"><span class="beacon"></span> Step 2 &middot; Pick Your Case</div>
+          <h2>Choose ONE Real Problem</h2>
+        </div>
+        <button class="btn ghost sm" id="changeCase" style="display:none" onclick="unpickCase()">&#8635; Change case</button>
+      </div>
+      <p class="lead tw">Debate for 4 minutes, then lock one. Others grey out &mdash; but you can always change (good UX never traps you).</p>
+
+      <div class="cases" id="caseCards"></div>
+
+      <ol class="steps" id="debateSteps"></ol>
+
+      <div class="row-actions">
+        <button class="btn ghost" onclick="go(2)">&larr; Back</button>
+        <button class="btn" id="caseNext" disabled onclick="go(4)">Open the Briefing &rarr;</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SCREEN 4 ============ -->
+  <section class="screen" data-screen="4">
+    <div class="panel">
+      <div class="brief-head">
+        <div>
+          <div class="kicker"><span class="beacon"></span> Step 3 &middot; Crime Briefing</div>
+          <h2>Predict the Threats</h2>
+          <ol class="steps" id="briefSteps"></ol>
+        </div>
+        <img src="Assets/detective%20svg.svg" alt="Detective inspecting UI">
+      </div>
+      <div id="briefCase" class="case-mission" style="max-width:none"></div>
+
+      <div class="crimegrid" id="briefGrid"></div>
+
+      <div class="brief-hint">&#128203; This is your <b>design contract</b>. Every crime marked <b>High</b> is flagged first in the final audit &mdash; the promises you make here are the ones you'll be held to.</div>
+
+      <div class="row-actions">
+        <button class="btn ghost" onclick="go(3)">&larr; Back</button>
+        <button class="btn" id="briefNext" disabled onclick="startMission()">Enter the Studio &rarr;</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SCREEN 5 ============ -->
+  <section class="screen" data-screen="5">
+    <div class="panel">
+      <div class="split">
+        <div>
+          <div class="kicker"><span class="beacon"></span> Step 4 &middot; The Studio</div>
+          <h2>Build Your UI</h2>
+        </div>
+        <div class="studio-timer">
+          <svg class="mini-hg" viewBox="0 0 40 52"><path class="hg-frame" d="M8 4h24M8 48h24M10 4c0 12 20 16 20 22s-20 10-20 22M30 4c0 12-20 16-20 22s20 10 20 22"/></svg>
+          <div><span class="t" id="studioTimer">12:00</span><small>build time left</small></div>
+        </div>
+      </div>
+      <p class="lead tw" id="studioLead"></p>
+
+      <div class="studio">
+        <div class="zone">
+          <h4>&#129521; Component Tray</h4>
+          <div class="tray" id="tray"></div>
+        </div>
+
+        <div class="zone">
+          <h4>&#128241; Phone Frame</h4>
+          <div class="phone-wrap">
+            <div class="phone">
+              <div class="notch"></div>
+              <div class="dropzone" id="dropzone"><div class="empty-hint">Drag components here<br>or use the smart prompt &rarr;</div></div>
+            </div>
+            <button class="btn ghost sm" style="margin-top:14px" onclick="clearPhone()">&#8635; Clear screen</button>
+          </div>
+        </div>
+
+        <div class="zone prompt-box">
+          <h4>&#10024; Smart Prompt Builder</h4>
+          <textarea id="promptInput" placeholder="Describe what you want&hellip; e.g. 'add a title saying Order Snacks, a quantity stepper, a green button saying Place Order and a success message'"></textarea>
+          <button class="btn sm" style="width:100%;margin-top:8px" onclick="runPrompt()">Add to screen &rarr;</button>
+          <div class="promptlog" id="promptLog"></div>
+          <div class="ex-chips" id="exChips"></div>
+        </div>
+      </div>
+
+      <div class="row-actions">
+        <button class="btn ghost" onclick="go(4)">&larr; Back</button>
+        <button class="btn" onclick="go(6)">Run the Crime Audit &rarr;</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SCREEN 6 ============ -->
+  <section class="screen" data-screen="6">
+    <div class="panel">
+      <div class="kicker"><span class="beacon"></span> Step 5 &middot; The Crime Audit</div>
+      <h2>Prove It &mdash; Committed or Avoided?</h2>
+      <ol class="steps" id="auditSteps"></ol>
+
+      <div class="audit">
+        <div>
+          <div class="counter">
+            <div class="lbl">Crimes Avoided</div>
+            <div class="big"><span id="auditDenom">0</span>/8</div>
+            <div id="auditReplica"></div>
+            <img src="Assets/detective%20svg.svg" alt="Detective inspecting UI">
+          </div>
+        </div>
+        <div class="audit-list" id="auditList"></div>
+      </div>
+
+      <div class="row-actions">
+        <button class="btn ghost" onclick="go(5)">&larr; Back to Studio</button>
+        <button class="btn" onclick="finishAudit()">See the Verdict &rarr;</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SCREEN 7 ============ -->
+  <section class="screen" data-screen="7">
+    <div class="report">
+      <div class="rc-top">
+        <div>
+          <div class="kicker"><span class="beacon g"></span> Studio Report Card</div>
+          <div class="tier" id="tierName">&mdash;</div>
+          <div style="font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:1px;margin-top:4px" id="caseSolved"></div>
+        </div>
+        <div>
+          <div class="lbl" style="text-align:right;font-family:var(--mono);font-size:11px;letter-spacing:2px;color:var(--muted);text-transform:uppercase">Crimes Avoided</div>
+          <div class="rc-score"><span id="scoreNum">0</span><span>/8</span></div>
+        </div>
+      </div>
+      <div class="team" id="teamStrip"></div>
+      <div class="split" style="margin-top:8px">
+        <h2 style="font-size:22px">Group Skill Ratings</h2>
+        <span class="auto-tag">Tap the stars &middot; Problem-Solving auto-filled</span>
+      </div>
+      <div class="skills" id="skillRows"></div>
+      <div class="row-actions">
+        <button class="btn ghost" onclick="go(6)">&larr; Back to Audit</button>
+        <button class="btn" onclick="go(8)">Debrief &rarr;</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SCREEN 8 ============ -->
+  <section class="screen" data-screen="8">
+    <div class="panel">
+      <div class="split">
+        <div style="flex:1;min-width:260px">
+          <div class="kicker"><span class="beacon g"></span> Step 6 &middot; Debrief</div>
+          <h2>What We Learned</h2>
+          <p class="lead tw" style="font-family:var(--serif);font-size:22px;color:var(--cream);max-width:none;margin-top:14px">&ldquo;Spotting crimes is easy. <span style="color:var(--accent)">Preventing them while you build</span> is the real skill.&rdquo;</p>
+        </div>
+        <img src="Assets/detective%20svg.svg" alt="Detectives" style="width:230px;filter:drop-shadow(0 20px 40px rgba(0,0,0,.6))">
+      </div>
+      <div class="debrief-prompts" id="debriefPrompts"></div>
+      <div class="row-actions">
+        <button class="btn" onclick="playAgain()">&#8635; Play again &mdash; swap roles</button>
+        <button class="btn ghost" onclick="downloadReport()">&#8595; Download our report card</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- PINNED CRIME RAIL -->
+<aside class="crime-rail" id="crimeRail">
+  <div class="rt">&#128269; The 8 UX Crimes</div>
+  <div id="railList"></div>
+  <div class="rail-hint">Tap any crime to read it</div>
+</aside>
+<button class="crime-fab" id="crimeFab" onclick="openCrimeList()" title="The 8 UX Crimes">&#128269;</button>
+
+<!-- MODAL -->
+<div class="modal-back" id="modalBack" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modalBox"></div>
+</div>
+
+<!-- MISSION TIMER OVERLAY -->
+<div class="mission-overlay" id="missionOverlay">
+  <div class="mission-card">
+    <div class="kicker"><span class="beacon"></span> Mission Clock Starting</div>
+    <h2>You have <span style="color:var(--accent)">12 minutes</span> to build.</h2>
+    <p>The sand is about to drop. Designer takes the keyboard, Product Lead calls the shots, Critic watches for crimes.</p>
+    <svg class="sandclock" viewBox="0 0 100 140">
+      <path class="hg-frame" d="M20 8h60M20 132h60M25 8c0 34 50 44 50 62s-50 28-50 62M75 8c0 34-50 44-50 62s50 28 50 62"/>
+      <clipPath id="topClip"><path d="M28 11c0 28 44 38 44 58H28c0-20 44-30 44-58"/></clipPath>
+      <g clip-path="url(#topClip)"><rect class="sand" id="topSand" x="20" y="11" width="60" height="58"/></g>
+      <clipPath id="botClip2"><path d="M25 130c0-20 50-30 50-58H25c0 28 50 38 50 58z"/></clipPath>
+      <g clip-path="url(#botClip2)"><rect class="sand" id="botSand" x="20" y="130" width="60" height="0"/></g>
+      <rect class="sand" x="49" y="66" width="2" height="12"/>
+    </svg>
+    <div class="hourglass-timer" id="overlayTimer">12:00</div>
+    <div class="row-actions" style="justify-content:center;margin-top:6px">
+      <button class="btn" onclick="beginBuild()">Start the Clock &rarr;</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============ DATA ============ */
+const CRIMES = [
+  {id:'lost',    name:'Lost!',            mean:'No indication of where you are or what just happened after an action.', ex:'Clicking Submit shows a blank white screen with no confirmation.'},
+  {id:'alien',   name:'Alien Speak',      mean:'Buttons or labels use jargon that does not match what they do.',        ex:'A button labelled "Initiate Session" that starts a video call.'},
+  {id:'escape',  name:'No Escape',        mean:'Cannot go back, undo, or cancel without losing your work.',             ex:'Filling a 10-field form and hitting back deletes all entries.'},
+  {id:'twins',   name:'Identical Twins',  mean:'Things that look the same do different things, or vice versa.',         ex:'Two green buttons side by side - one saves, one submits permanently.'},
+  {id:'error',   name:'Error, So What?',  mean:'An error appears but does not tell you what to do next.',               ex:'Error 403 with no explanation or recovery path.'},
+  {id:'marathon',name:'Marathon Click',   mean:'A simple task takes far more steps than it should.',                    ex:'Downloading your timetable takes 7 taps across 4 screens.'},
+  {id:'chaos',   name:'Visual Chaos',     mean:'So much on screen that you do not know where to look first.',           ex:'A dashboard with 14 badges, 3 banners and 6 menus at once.'},
+  {id:'silent',  name:'Silent Action',    mean:'No confirmation that anything happened after an action.',               ex:'Tapping Save with no visual change, sound or message.'}
+];
+
+const CASES = [
+  {id:'homework', title:'The Vanishing Homework',
+   body:'Students submit homework but never know if it went through - half re-submit "just in case".',
+   mission:'Design a homework submission screen where the student always knows their status.',
+   crimes:['Lost!','Silent Action','Error, So What?']},
+  {id:'canteen', title:'The Canteen Queue',
+   body:'The canteen pre-order app takes 8 taps to order one snack, so nobody uses it.',
+   mission:'Design a "quick order" flow from open-app to order-placed in as few steps as possible.',
+   crimes:['Marathon Click','Alien Speak','Visual Chaos']},
+  {id:'fieldtrip', title:'The Field-Trip Form',
+   body:'Parents fill a long permission form; one wrong tap on "Back" wipes everything.',
+   mission:'Design a multi-step form that protects the user work and confirms success clearly.',
+   crimes:['No Escape','Identical Twins','Lost!']}
+];
+
+/* ============ COMPONENT LIBRARY (grouped, ~32 blocks) ============ */
+const COMPONENTS = {
+  header:   {ic:'📱',cat:'Structure', label:'Header bar',       html:function(t){return '<div class="c-header">'+(t||'App Name')+'</div>';}},
+  text:     {ic:'🔤',cat:'Structure', label:'Title / Heading',  html:function(t){return '<div class="c-text">'+(t||'Screen title')+'</div>';}},
+  paragraph:{ic:'📝',cat:'Structure', label:'Body text',        html:function(t){return '<div class="c-para">'+(t||'A short sentence that explains what to do.')+'</div>';}},
+  divider:  {ic:'➖',cat:'Structure', label:'Divider',          html:function(t){return '<div class="c-divider"></div>';}},
+  card:     {ic:'🗂️',cat:'Structure', label:'Card',             html:function(t){return '<div class="c-card"><b>'+(t||'Card title')+'</b>Supporting detail text.</div>';}},
+  listitem: {ic:'📋',cat:'Structure', label:'List item',        html:function(t){return '<div class="c-list"><span>'+(t||'List row')+'</span><i>›</i></div>';}},
+
+  button:   {ic:'🔘',cat:'Actions',   label:'Button',           html:function(t){return '<div class="c-button">'+(t||'Submit')+'</div>';}},
+  next:     {ic:'⏭️',cat:'Actions',   label:'Next button',      html:function(t){return '<div class="c-button">'+(t||'Next →')+'</div>';}},
+  back:     {ic:'↩️',cat:'Actions',   label:'Back button',      html:function(t){return '<div class="c-back">← '+(t||'Back')+'</div>';}},
+  link:     {ic:'🔗',cat:'Actions',   label:'Text link',        html:function(t){return '<div class="c-link">'+(t||'Learn more')+'</div>';}},
+  popup:    {ic:'💬',cat:'Actions',   label:'Confirm popup',    html:function(t){return '<div class="c-popup">'+(t||'Are you sure?')+'<div class="pbtns"><b class="sec">Cancel</b><b>Confirm</b></div></div>';}},
+
+  input:    {ic:'⌨️',cat:'Inputs',    label:'Input field',      html:function(t){return '<div class="c-input">'+(t||'Type here…')+'</div>';}},
+  search:   {ic:'🔎',cat:'Inputs',    label:'Search bar',       html:function(t){return '<div class="c-search">🔍 '+(t||'Search…')+'</div>';}},
+  dropdown: {ic:'🔽',cat:'Inputs',    label:'Dropdown',         html:function(t){return '<div class="c-dropdown"><span>'+(t||'Choose an option')+'</span><span>▾</span></div>';}},
+  checkbox: {ic:'☑️',cat:'Inputs',    label:'Checkbox',         html:function(t){return '<div class="c-check"><i>✓</i> '+(t||'I agree')+'</div>';}},
+  radio:    {ic:'🔘',cat:'Inputs',    label:'Radio option',     html:function(t){return '<div class="c-radio"><i></i> '+(t||'Option A')+'</div>';}},
+  toggle:   {ic:'🎚️',cat:'Inputs',    label:'Toggle switch',    html:function(t){return '<div class="c-toggle"><span>'+(t||'Notifications')+'</span><b></b></div>';}},
+  quantity: {ic:'➕',cat:'Inputs',    label:'Quantity stepper', html:function(t){return '<div class="c-qty"><b>–</b><span>1</span><b>+</b></div>';}},
+  rating:   {ic:'⭐',cat:'Inputs',    label:'Star rating',      html:function(t){return '<div class="c-rating">★★★★☆</div>';}},
+
+  success:  {ic:'✅',cat:'Feedback',  label:'Success message',  html:function(t){return '<div class="c-success"><span>✓</span> '+(t||'Submitted successfully!')+'</div>';}},
+  error:    {ic:'⚠️',cat:'Feedback',  label:'Error message',    html:function(t){return '<div class="c-error">'+(t||'Something went wrong.')+'<small>Check your details and tap Retry.</small></div>';}},
+  banner:   {ic:'📢',cat:'Feedback',  label:'Info banner',      html:function(t){return '<div class="c-banner">'+(t||'Heads up! Orders close at 1 PM.')+'</div>';}},
+  progress: {ic:'📊',cat:'Feedback',  label:'Progress bar',     html:function(t){return '<div class="c-progress"><div class="bar"><i></i></div><span>'+(t||'Step 2 of 3')+'</span></div>';}},
+  steps:    {ic:'🔢',cat:'Feedback',  label:'Step indicator',   html:function(t){return '<div class="c-steps"><b class="on">1</b><b class="on">2</b><b>3</b></div>';}},
+  spinner:  {ic:'⏳',cat:'Feedback',  label:'Loading spinner',  html:function(t){return '<div class="c-spin"><i></i> '+(t||'Loading…')+'</div>';}},
+
+  icon:     {ic:'🌟',cat:'Media',     label:'Icon',             html:function(t){return '<div class="c-icon">⭐</div>';}},
+  image:    {ic:'🖼️',cat:'Media',     label:'Image',            html:function(t){return '<div class="c-image">🖼 '+(t||'Image')+'</div>';}},
+  avatar:   {ic:'👤',cat:'Media',     label:'Avatar + name',    html:function(t){return '<div class="c-avatar"><b>🙂</b> '+(t||'Riya Sharma')+'</div>';}},
+  badge:    {ic:'🔴',cat:'Media',     label:'Notification badge',html:function(t){return '<div class="c-badgewrap">🔔<span class="c-badge">'+(t||'3')+'</span></div>';}},
+  price:    {ic:'🏷️',cat:'Media',     label:'Price tag',        html:function(t){return '<div class="c-price">'+(t||'₹40')+'</div>';}},
+  chip:     {ic:'🔖',cat:'Media',     label:'Tag / chip',       html:function(t){return '<div class="c-chip">'+(t||'Popular')+'</div>';}},
+
+  menu:     {ic:'☰',cat:'Navigation',label:'Top menu',         html:function(t){return '<div class="c-menu"><span>Home</span><span>Orders</span><span>Profile</span></div>';}},
+  tabbar:   {ic:'📲',cat:'Navigation',label:'Bottom tab bar',   html:function(t){return '<div class="c-tabbar"><span>🏠</span><span>🔍</span><span>🛒</span><span>👤</span></div>';}}
+};
+
+/* ============ SMART PROMPT ENGINE ============ */
+// ordered specific -> generic; first keyword hit in a clause wins
+const KEYWORDS = [
+  {c:'next',    k:['next button','next step','next','continue','proceed','go on']},
+  {c:'back',    k:['back button','go back','cancel button','return button','undo']},
+  {c:'success', k:['success','submitted','order placed','placed','confirmed','well done','done message','tick','green tick','thank you','completed']},
+  {c:'error',   k:['error','failed','failure','went wrong','something wrong','invalid','red message','try again']},
+  {c:'banner',  k:['banner','announcement','notice','heads up','info bar','alert bar']},
+  {c:'progress',k:['progress bar','progress','loading bar','completion bar']},
+  {c:'steps',   k:['step indicator','stepper dots','steps','wizard','1 2 3']},
+  {c:'spinner', k:['spinner','loading','please wait','processing']},
+  {c:'search',  k:['search bar','search box','search field','search']},
+  {c:'dropdown',k:['dropdown','drop down','select box','picker','combo box']},
+  {c:'checkbox',k:['checkbox','check box','tick box','agree box','consent']},
+  {c:'radio',   k:['radio','choose one','single choice','option button']},
+  {c:'toggle',  k:['toggle','switch','on off','enable option']},
+  {c:'quantity',k:['quantity','stepper','plus minus','how many','qty','counter']},
+  {c:'rating',  k:['rating','star rating','stars','review score','rate']},
+  {c:'price',   k:['price','cost','amount','rupee','rupees','₹']},
+  {c:'chip',    k:['chip','tag','pill','label pill','category']},
+  {c:'badge',   k:['badge','notification','unread','bell','count bubble']},
+  {c:'avatar',  k:['avatar','profile pic','profile picture','user photo','account','profile']},
+  {c:'listitem',k:['list item','list row','list','menu row']},
+  {c:'card',    k:['card','tile','panel','box']},
+  {c:'header',  k:['header','top bar','app bar','nav bar','navbar','title bar']},
+  {c:'tabbar',  k:['tab bar','bottom nav','bottom bar','bottom tabs','navigation bar']},
+  {c:'menu',    k:['menu','nav ','navigation']},
+  {c:'popup',   k:['popup','pop up','confirmation','confirm','dialog','modal','are you sure']},
+  {c:'image',   k:['image','photo','picture','pic','thumbnail','banner image']},
+  {c:'divider', k:['divider','separator','horizontal line','line break','hr']},
+  {c:'link',    k:['link','hyperlink','learn more','text link']},
+  {c:'input',   k:['input','text field','text box','textbox','enter','type ','field']},
+  {c:'paragraph',k:['paragraph','body text','description','sentence','instructions','explain']},
+  {c:'text',    k:['title','heading','headline','header text','label']},
+  {c:'button',  k:['button','tap','click','submit','send','order','save','place order','pay','buy','checkout','cta']}
+];
+
+function splitClauses(raw){
+  // split on connectors, commas, semicolons
+  return raw.split(/\s*(?:,|;|&|\+|\bthen\b|\bplus\b|\balso\b|\band\b|\bwith\b)\s*/i)
+            .map(function(s){return s.trim();}).filter(Boolean);
+}
+function extractText(clause){
+  // 1) quoted text wins
+  var q = clause.match(/["“'']([^"”'']{1,40})["”'']/);
+  if(q) return q[1].trim();
+  // 2) "saying / says / labeled / titled / reading / called X"
+  var m = clause.match(/(?:that says|saying|says|say|labell?ed|titled|reading|reads|with text|with label|called|named)\s+(.{1,40})$/i);
+  if(m) return m[1].replace(/["'.]+$/,'').trim();
+  return null;
+}
+function matchComponent(clause){
+  var lower = ' '+clause.toLowerCase()+' ';
+  var text = extractText(clause);
+  for(var i=0;i<KEYWORDS.length;i++){
+    var g = KEYWORDS[i];
+    for(var j=0;j<g.k.length;j++){
+      if(lower.indexOf(g.k[j])!==-1){
+        return {key:g.c, text:text};
+      }
+    }
+  }
+  return null;
+}
+
+/* ============ STATE ============ */
+let state = loadState() || freshState();
+function freshState(){
+  return {screen:1,names:{lead:'',designer:'',critic:''},caseId:null,risks:{},prevent:{},
+          layout:[],audit:{},evidence:{},skills:{empathy:0,communication:0,problem:0,collaboration:0,design:0},
+          debrief:{designer:'',critic:'',lead:''},_timeLeft:720};
+}
+function saveState(){ try{localStorage.setItem('uxsquad',JSON.stringify(state));}catch(e){} }
+function loadState(){ try{return JSON.parse(localStorage.getItem('uxsquad'));}catch(e){return null;} }
+function resetAll(){ if(confirm('Clear all saved progress and start over?')){localStorage.removeItem('uxsquad');location.reload();} }
+// normalise layout items to {k,t}
+function normItem(it){ return (typeof it==='string')?{k:it,t:null}:it; }
+
+/* ============ TYPEWRITER ============ */
+function typeHTML(el, html, speed){
+  if(el._twTimer){clearTimeout(el._twTimer);el._twTimer=null;}
+  var tokens=[], re=/(<[^>]+>)|(&[a-zA-Z#0-9]+;)|([\s\S])/g, m;
+  while((m=re.exec(html))) tokens.push(m[0]);
+  var i=0,out='';
+  el.classList.add('typing');
+  function step(){
+    var addedChar=false;
+    while(i<tokens.length && !addedChar){var tk=tokens[i++];out+=tk;if(tk.charAt(0)!=='<')addedChar=true;}
+    if(i>=tokens.length){el.innerHTML=out;el.classList.remove('typing');el._twTimer=null;return;}
+    el.innerHTML=out+'<span class="caret"></span>';
+    el._twTimer=setTimeout(step,speed);
+  }
+  step();
+}
+function typeScreen(n){
+  var scr=document.querySelector('.screen[data-screen="'+n+'"]');
+  if(!scr) return;
+  scr.querySelectorAll('.tw').forEach(function(el){
+    var html=el.getAttribute('data-full');
+    if(html==null){html=el.innerHTML;el.setAttribute('data-full',html);}
+    typeHTML(el, html, 16);
+  });
+}
+
+/* ============ NAV ============ */
+function go(n){
+  state.screen=n; saveState();
+  document.querySelectorAll('.screen').forEach(function(s){s.classList.toggle('active',+s.dataset.screen===n);});
+  renderDots(n);
+  document.body.classList.toggle('rail-on', n===5||n===6);
+  if(n===5||n===6) renderRail();
+  window.scrollTo({top:0,behavior:'smooth'});
+  if(n===3) renderCases();
+  if(n===4) renderBrief();
+  if(n===5) renderStudio();
+  if(n===6) renderAudit();
+  if(n===7) renderReport();
+  if(n===8) renderDebrief();
+  typeScreen(n);
+}
+function renderDots(n){
+  var d=document.getElementById('dots'); d.innerHTML='';
+  for(var i=1;i<=8;i++){var el=document.createElement('i'); if(i===n)el.className='on'; else if(i<n)el.className='done'; d.appendChild(el);}
+}
+
+/* ============ SCREEN 2 ============ */
+function checkRoles(){
+  var inputs=document.querySelectorAll('.name-in'), all=true;
+  inputs.forEach(function(inp){var v=inp.value.trim(); state.names[inp.dataset.key]=v; inp.closest('.role-card').classList.toggle('filled',v.length>0); if(!v)all=false;});
+  document.getElementById('rolesNext').disabled=!all; saveState();
+}
+function hydrateRoles(){ document.querySelectorAll('.name-in').forEach(function(inp){inp.value=state.names[inp.dataset.key]||'';}); checkRoles(); }
+
+/* ============ SCREEN 3 ============ */
+function renderCases(){
+  var L=state.names.lead||'Product Lead',D=state.names.designer||'Designer',C=state.names.critic||'Critic';
+  document.getElementById('debateSteps').innerHTML=
+    '<li><b>'+L+'</b> reads all three cases aloud.</li>'+
+    '<li><b>'+C+'</b> argues which has the worst current UX.</li>'+
+    '<li><b>'+D+'</b> argues which is most buildable in 12 min.</li>'+
+    '<li><b>'+L+'</b> makes the final call and taps <b>Take this case</b>.</li>';
+  var wrap=document.getElementById('caseCards'); wrap.innerHTML='';
+  CASES.forEach(function(c){
+    var picked=state.caseId===c.id, dim=state.caseId&&!picked;
+    var card=document.createElement('div');
+    card.className='case-card'+(picked?' picked':'')+(dim?' dim':'');
+    card.innerHTML='<div class="pick-mark">✓</div>'+
+      '<div class="case-title">'+c.title+'</div>'+
+      '<div class="case-body">'+c.body+'</div>'+
+      '<div class="case-mission"><b>Your mission:</b> '+c.mission+'</div>'+
+      '<div class="crimechips">'+c.crimes.map(function(x){return '<span class="chip">'+x+'</span>';}).join('')+'</div>'+
+      '<button class="btn sm" style="width:100%">'+(picked?'✓ Case taken':'Take this case')+'</button>';
+    card.querySelector('button').onclick=function(e){e.stopPropagation();pickCase(c.id);};
+    wrap.appendChild(card);
+  });
+  document.getElementById('changeCase').style.display=state.caseId?'inline-block':'none';
+  document.getElementById('caseNext').disabled=!state.caseId;
+}
+function pickCase(id){state.caseId=id;saveState();renderCases();}
+function unpickCase(){state.caseId=null;saveState();renderCases();}
+
+/* ============ SCREEN 4 ============ */
+function renderBrief(){
+  var C=state.names.critic||'Critic',L=state.names.lead||'Product Lead',D=state.names.designer||'Designer';
+  document.getElementById('briefSteps').innerHTML=
+    '<li><b>'+C+'</b> reads a crime aloud.</li>'+
+    '<li>Group asks: &ldquo;where could this bite us?&rdquo;</li>'+
+    '<li><b>'+L+'</b> sets the risk; <b>'+D+'</b> notes a fix.</li>'+
+    '<li>Repeat for all 8 &mdash; even Low risk.</li>';
+  var c=CASES.find(function(x){return x.id===state.caseId;});
+  document.getElementById('briefCase').innerHTML='<b>'+c.title+' - your mission:</b> '+c.mission;
+  var grid=document.getElementById('briefGrid'); grid.innerHTML='';
+  CRIMES.forEach(function(cr,i){
+    var risk=state.risks[cr.id]||'';
+    var tile=document.createElement('div');
+    tile.className='crime-tile'+(risk?(' '+risk.toLowerCase()):'');
+    tile.innerHTML='<div class="crime-head"><span class="crime-num">'+(i+1)+'/8</span><span class="crime-title">'+cr.name+'</span></div>'+
+      '<div class="crime-mean">'+cr.mean+'</div><div class="crime-ex">e.g. '+cr.ex+'</div>'+
+      '<div class="risk-row">'+['High','Medium','Low'].map(function(r){return '<button class="risk-btn'+(risk===r?' sel-'+r.toLowerCase():'')+'" data-r="'+r+'">'+r+' risk</button>';}).join('')+'</div>'+
+      '<div class="prevent"><label>How we will prevent it &rarr;</label><input class="field prevent-in" placeholder="One prevention idea&hellip;" value="'+(state.prevent[cr.id]||'').replace(/"/g,'&quot;')+'"></div>';
+    tile.querySelectorAll('.risk-btn').forEach(function(b){b.onclick=function(){setRisk(cr.id,b.dataset.r);};});
+    tile.querySelector('.prevent-in').addEventListener('input',function(e){state.prevent[cr.id]=e.target.value;saveState();});
+    grid.appendChild(tile);
+  });
+  checkBrief();
+}
+function setRisk(id,r){state.risks[id]=r;saveState();renderBrief();}
+function checkBrief(){document.getElementById('briefNext').disabled=!CRIMES.every(function(cr){return state.risks[cr.id];});}
+
+/* ============ PINNED CRIME RAIL + MODAL ============ */
+function renderRail(){
+  var list=document.getElementById('railList'); list.innerHTML='';
+  CRIMES.forEach(function(cr,i){
+    var high=state.risks[cr.id]==='High';
+    var chip=document.createElement('div');
+    chip.className='rail-chip'+(high?' high':'');
+    chip.innerHTML='<span class="n">'+(i+1)+'</span> '+cr.name+(high?' 🚩':'');
+    chip.onclick=function(){showCrime(cr.id);};
+    list.appendChild(chip);
+  });
+}
+function openCrimeList(){
+  var box=document.getElementById('modalBox');
+  box.innerHTML='<button class="x" onclick="closeModal()">✕</button><div class="mtag">Reference Card</div><h3>The 8 UX Crimes</h3>'+
+    CRIMES.map(function(cr,i){var high=state.risks[cr.id]==='High';
+      return '<div class="rail-chip'+(high?' high':'')+'" onclick="showCrime(\''+cr.id+'\')"><span class="n">'+(i+1)+'</span> '+cr.name+(high?' 🚩':'')+'</div>';}).join('');
+  document.getElementById('modalBack').classList.add('show');
+}
+function showCrime(id){
+  var cr=CRIMES.find(function(x){return x.id===id;});
+  var risk=state.risks[id]||'', prev=state.prevent[id]||'';
+  var box=document.getElementById('modalBox');
+  box.innerHTML='<button class="x" onclick="closeModal()">✕</button>'+
+    '<div class="mtag">UX Crime #'+(CRIMES.indexOf(cr)+1)+'</div>'+
+    '<h3>'+cr.name+'</h3>'+
+    '<div class="mrow"><b>What it means:</b> '+cr.mean+'</div>'+
+    '<div class="mex">e.g. '+cr.ex+'</div>'+
+    (prev?'<div class="mrow" style="margin-top:12px"><b>Our prevention plan:</b> '+prev+'</div>':'')+
+    '<span class="mrisk '+(risk?risk.toLowerCase():'none')+'">'+(risk?risk+' risk':'risk not set')+'</span>';
+  document.getElementById('modalBack').classList.add('show');
+}
+function closeModal(){document.getElementById('modalBack').classList.remove('show');}
+
+/* ============ MISSION TIMER ============ */
+let timer=null,timeLeft=720,sandAnim=null;
+function startMission(){document.getElementById('missionOverlay').classList.add('show');animateSandclock();}
+function beginBuild(){ if(sandAnim){clearInterval(sandAnim);sandAnim=null;} document.getElementById('missionOverlay').classList.remove('show'); go(5); }
+function startCountdown(){
+  if(timer)clearInterval(timer);
+  timeLeft=(state._timeLeft!=null)?state._timeLeft:720; updateTimerDisplay();
+  timer=setInterval(function(){timeLeft--;state._timeLeft=timeLeft;saveState();updateTimerDisplay();if(timeLeft<=0)clearInterval(timer);},1000);
+}
+function updateTimerDisplay(){
+  var m=Math.floor(Math.max(timeLeft,0)/60),s=Math.max(timeLeft,0)%60,txt=m+':'+(s<10?'0':'')+s;
+  var st=document.getElementById('studioTimer'); if(st){st.textContent=txt;st.classList.toggle('warn',timeLeft<=120);}
+}
+function animateSandclock(){
+  var top=document.getElementById('topSand'),bot=document.getElementById('botSand'),ot=document.getElementById('overlayTimer');
+  var p=0,t=720; if(sandAnim)clearInterval(sandAnim);
+  sandAnim=setInterval(function(){
+    if(!document.getElementById('missionOverlay').classList.contains('show')){clearInterval(sandAnim);sandAnim=null;return;}
+    p=(p+1)%101;
+    top.setAttribute('y',11+p*0.5); top.setAttribute('height',Math.max(0,58-p*0.5));
+    bot.setAttribute('y',130-p*0.55); bot.setAttribute('height',p*0.55);
+    var m=Math.floor(t/60),s=t%60; ot.textContent=m+':'+(s<10?'0':'')+s; t=t<=0?720:t-6;
+  },80);
+}
+
+/* ============ SCREEN 5 STUDIO ============ */
+function renderStudio(){
+  var c=CASES.find(function(x){return x.id===state.caseId;});
+  var sl=document.getElementById('studioLead');
+  var slHTML='<b>'+state.names.designer+'</b> drives. Build a UI that solves: <b>'+c.mission+'</b> &middot; <b>'+state.names.lead+'</b> watches the clock &middot; <b>'+state.names.critic+'</b> watches for crimes (pinned card on the right).';
+  sl.setAttribute('data-full', slHTML); sl.innerHTML=slHTML;
+
+  // grouped tray
+  var tray=document.getElementById('tray'); tray.innerHTML='';
+  var cats=[]; Object.keys(COMPONENTS).forEach(function(k){var cat=COMPONENTS[k].cat; if(cats.indexOf(cat)===-1)cats.push(cat);});
+  cats.forEach(function(cat){
+    var h=document.createElement('div'); h.className='tray-cat'; h.textContent=cat; tray.appendChild(h);
+    Object.keys(COMPONENTS).forEach(function(key){
+      var comp=COMPONENTS[key]; if(comp.cat!==cat) return;
+      var it=document.createElement('div');
+      it.className='tray-item'; it.draggable=true; it.dataset.key=key;
+      it.innerHTML='<span class="ic">'+comp.ic+'</span> '+comp.label;
+      it.addEventListener('dragstart',function(e){e.dataTransfer.setData('key',key);e.dataTransfer.setData('src','tray');});
+      it.addEventListener('click',function(){addComponent(key);});
+      tray.appendChild(it);
+    });
+  });
+
+  // example prompt chips
+  var ex=['a search bar','a card with a price tag','a green success message saying Order placed','a back button and a next button','a progress bar saying Step 2 of 3','a title saying Welcome and a body text'];
+  var exWrap=document.getElementById('exChips'); exWrap.innerHTML='';
+  ex.forEach(function(p){var b=document.createElement('button');b.className='exc';b.textContent=p;b.onclick=function(){document.getElementById('promptInput').value=p;runPrompt();};exWrap.appendChild(b);});
+
+  renderLayout();
+
+  var dz=document.getElementById('dropzone');
+  dz.ondragover=function(e){e.preventDefault();dz.classList.add('over');};
+  dz.ondragleave=function(){dz.classList.remove('over');};
+  dz.ondrop=function(e){e.preventDefault();dz.classList.remove('over');
+    if(e.dataTransfer.getData('src')==='tray'){addComponent(e.dataTransfer.getData('key'));}};
+  startCountdown();
+}
+function addComponent(key,text){ state.layout.push({k:key,t:text||null}); saveState(); renderLayout(); }
+function removeComponent(i){ state.layout.splice(i,1); saveState(); renderLayout(); }
+function moveComp(i,dir){ var j=i+dir; if(j<0||j>=state.layout.length)return; var t=state.layout[i];state.layout[i]=state.layout[j];state.layout[j]=t; saveState(); renderLayout(); }
+function clearPhone(){ if(confirm('Clear the whole screen?')){state.layout=[];saveState();renderLayout();} }
+function renderLayout(){
+  var dz=document.getElementById('dropzone'); dz.innerHTML='';
+  if(!state.layout.length){ dz.innerHTML='<div class="empty-hint">Drag components here<br>or use the smart prompt &rarr;</div>'; return; }
+  state.layout.forEach(function(raw,i){
+    var it=normItem(raw), comp=COMPONENTS[it.k]; if(!comp)return;
+    var el=document.createElement('div'); el.className='comp'; el.draggable=true;
+    el.innerHTML=comp.html(it.t)+
+      '<button class="move" title="Drag to reorder">⇅</button>'+
+      '<div class="ctrls"><button onclick="moveComp('+i+',-1)" title="Move up">↑</button>'+
+      '<button onclick="moveComp('+i+',1)" title="Move down">↓</button>'+
+      '<button class="rm" onclick="removeComponent('+i+')" title="Delete">✕</button></div>';
+    el.addEventListener('dragstart',function(e){e.dataTransfer.setData('from',i);e.dataTransfer.setData('src','phone');el.classList.add('dragging');});
+    el.addEventListener('dragend',function(){el.classList.remove('dragging');});
+    el.addEventListener('dragover',function(e){e.preventDefault();el.classList.add('insert-before');});
+    el.addEventListener('dragleave',function(){el.classList.remove('insert-before');});
+    el.addEventListener('drop',function(e){
+      e.preventDefault();e.stopPropagation();el.classList.remove('insert-before');
+      if(e.dataTransfer.getData('src')==='phone'){
+        var from=+e.dataTransfer.getData('from'); if(from===i)return;
+        var item=state.layout.splice(from,1)[0];
+        var to=from<i?i-1:i; state.layout.splice(to,0,item);
+        saveState(); renderLayout();
+      } else if(e.dataTransfer.getData('src')==='tray'){
+        var item2={k:e.dataTransfer.getData('key'),t:null};
+        state.layout.splice(i,0,item2); saveState(); renderLayout();
+      }
+    });
+    dz.appendChild(el);
+  });
+}
+function runPrompt(){
+  var inp=document.getElementById('promptInput'), raw=inp.value.trim(), log=document.getElementById('promptLog');
+  if(!raw)return;
+  var clauses=splitClauses(raw), added=[];
+  clauses.forEach(function(cl){var m=matchComponent(cl); if(m){addComponent(m.key,m.text);added.push(m);}});
+  if(added.length){
+    added.forEach(function(m){
+      var line=document.createElement('div'); line.className='ok';
+      line.innerHTML='✓ Added <b>'+COMPONENTS[m.key].label+'</b>'+(m.text?' &mdash; &ldquo;'+m.text+'&rdquo;':'');
+      log.prepend(line);
+    });
+    inp.value='';
+  } else {
+    var line=document.createElement('div'); line.className='no';
+    line.innerHTML='? Could not match that. Try naming a component: <b>button, success, error, search, card, progress, dropdown, toggle, price, image, popup, back, next</b>&hellip; or tap an example below.';
+    log.prepend(line);
+  }
+}
+
+/* ============ SCREEN 6 AUDIT ============ */
+function renderAudit(){
+  var list=document.getElementById('auditList'); list.innerHTML='';
+  var rep=document.getElementById('auditReplica');
+  rep.innerHTML=state.layout.length
+    ? '<div style="font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;margin-top:12px">'+state.layout.length+' components built</div>'
+    : '<div style="font-family:var(--mono);font-size:10px;color:var(--red);margin-top:12px">Empty screen - build something first!</div>';
+  CRIMES.forEach(function(cr,i){
+    var high=state.risks[cr.id]==='High', v=state.audit[cr.id]||'';
+    var row=document.createElement('div'); row.className='audit-row'+(high?' flagged':'');
+    row.innerHTML='<div class="ah"><span class="crime-num">'+(i+1)+'</span><span class="crime-title">'+cr.name+'</span>'+(high?'<span class="predicted">🚩 Predicted High</span>':'')+'</div>'+
+      '<div class="am">'+cr.mean+'</div>'+
+      '<div class="verdict-row"><button class="vbtn'+(v==='avoided'?' sel-avoided':'')+'" data-v="avoided">✓ Avoided</button>'+
+      '<button class="vbtn'+(v==='committed'?' sel-committed':'')+'" data-v="committed">✗ Committed</button></div>'+
+      '<input class="field ev-in" placeholder="Evidence: e.g. We avoided this because&hellip;" value="'+(state.evidence[cr.id]||'').replace(/"/g,'&quot;')+'">';
+    row.querySelectorAll('.vbtn').forEach(function(b){b.onclick=function(){state.audit[cr.id]=b.dataset.v;saveState();renderAudit();};});
+    row.querySelector('.ev-in').addEventListener('input',function(e){state.evidence[cr.id]=e.target.value;saveState();});
+    list.appendChild(row);
+  });
+  document.getElementById('auditDenom').textContent=CRIMES.filter(function(cr){return state.audit[cr.id]==='avoided';}).length;
+}
+function finishAudit(){
+  var avoided=CRIMES.filter(function(cr){return state.audit[cr.id]==='avoided';}).length;
+  state.skills.problem=Math.max(1,Math.round(avoided/8*5)); saveState(); go(7);
+}
+
+/* ============ SCREEN 7 REPORT ============ */
+const SKILL_DEFS=[
+  {key:'empathy',name:'Empathy',how:'Did the design solve the actual user problem?'},
+  {key:'communication',name:'Communication',how:'Did all 3 voices contribute?'},
+  {key:'problem',name:'Problem-Solving',how:'Crimes avoided score (X / 8).',auto:true},
+  {key:'collaboration',name:'Collaboration',how:'Stuck to roles, no one dominated?'},
+  {key:'design',name:'Design Thinking',how:'Predicted crimes and prevented them?'}
+];
+function renderReport(){
+  var avoided=CRIMES.filter(function(cr){return state.audit[cr.id]==='avoided';}).length;
+  document.getElementById('scoreNum').textContent=avoided;
+  var tier,cls;
+  if(avoided===8){tier='Master Studio';cls='master';} else if(avoided>=6){tier='Pro Studio';cls='pro';}
+  else if(avoided>=4){tier='Junior Studio';cls='junior';} else {tier='Back to the Drawing Board';cls='back';}
+  var tn=document.getElementById('tierName'); tn.textContent=tier; tn.className='tier '+cls;
+  var c=CASES.find(function(x){return x.id===state.caseId;});
+  document.getElementById('caseSolved').textContent='Case: '+(c?c.title:'-');
+  document.getElementById('teamStrip').innerHTML=
+    '<div class="p"><b>Product Lead</b>'+state.names.lead+'</div>'+
+    '<div class="p"><b>Designer</b>'+state.names.designer+'</div>'+
+    '<div class="p"><b>Critic / User Tester</b>'+state.names.critic+'</div>';
+  var rows=document.getElementById('skillRows'); rows.innerHTML='';
+  SKILL_DEFS.forEach(function(sk){
+    var val=state.skills[sk.key]||0;
+    var row=document.createElement('div'); row.className='skill-row';
+    row.innerHTML='<div class="skill-name">'+sk.name+'<small>'+sk.how+'</small></div>'+
+      '<div class="stars">'+[1,2,3,4,5].map(function(n){return '<span class="star'+(n<=val?' on':'')+'" data-n="'+n+'">★</span>';}).join('')+'</div>'+
+      '<div class="auto-tag">'+(sk.auto?'auto: '+val+'/5':'tap to set')+'</div>';
+    row.querySelectorAll('.star').forEach(function(s){s.onclick=function(){state.skills[sk.key]=+s.dataset.n;saveState();renderReport();};});
+    rows.appendChild(row);
+  });
+}
+
+/* ============ SCREEN 8 DEBRIEF ============ */
+function renderDebrief(){
+  var el=document.getElementById('debriefPrompts');
+  var prompts=[
+    {who:'Designer',nm:state.names.designer,q:'"One crime I nearly committed&hellip;"',key:'designer'},
+    {who:'Critic / User Tester',nm:state.names.critic,q:'"The sneakiest crime to catch was&hellip;"',key:'critic'},
+    {who:'Product Lead',nm:state.names.lead,q:'"If we had 5 more minutes we would fix&hellip;"',key:'lead'}
+  ];
+  el.innerHTML='';
+  prompts.forEach(function(p){
+    var dp=document.createElement('div'); dp.className='dp';
+    dp.innerHTML='<div class="who">'+p.who+'</div><div class="q">'+p.q+'</div><div class="nm">Answered aloud by '+p.nm+'</div>'+
+      '<input class="field" style="margin-top:10px" placeholder="Type the answer (optional)&hellip;" value="'+(state.debrief[p.key]||'').replace(/"/g,'&quot;')+'">';
+    dp.querySelector('input').addEventListener('input',function(e){state.debrief[p.key]=e.target.value;saveState();});
+    el.appendChild(dp);
+  });
+}
+function playAgain(){ if(confirm('Play again with swapped roles? This resets the mission.')){localStorage.removeItem('uxsquad');state=freshState();saveState();hydrateRoles();go(1);} }
+
+/* ============ DOWNLOAD REPORT ============ */
+function downloadReport(){
+  var avoided=CRIMES.filter(function(cr){return state.audit[cr.id]==='avoided';}).length;
+  var tier; if(avoided===8)tier='MASTER STUDIO';else if(avoided>=6)tier='PRO STUDIO';else if(avoided>=4)tier='JUNIOR STUDIO';else tier='BACK TO THE DRAWING BOARD';
+  var c=CASES.find(function(x){return x.id===state.caseId;});
+  var cv=document.createElement('canvas'); cv.width=1000; cv.height=760; var x=cv.getContext('2d');
+  var g=x.createLinearGradient(0,0,1000,760); g.addColorStop(0,'#1e1810');g.addColorStop(1,'#0d0a07'); x.fillStyle=g; x.fillRect(0,0,1000,760);
+  x.strokeStyle='#ef9d3f';x.lineWidth=4;x.strokeRect(24,24,952,712);
+  x.fillStyle='#ef9d3f';x.font='bold 20px Courier New';x.fillText('UX DETECTIVE - SQUAD MODE - STUDIO REPORT CARD',60,80);
+  x.fillStyle='#ece2d4';x.font='bold 56px Georgia';x.fillText(tier,60,166);
+  x.fillStyle='#4bbf7b';x.font='bold 90px Georgia';x.fillText(avoided+' / 8',60,290);
+  x.fillStyle='#9a8d7c';x.font='16px Courier New';x.fillText('CRIMES AVOIDED',62,320);
+  x.fillStyle='#ece2d4';x.font='20px Georgia';x.fillText('Case: '+(c?c.title:'-'),60,378);
+  x.fillStyle='#ef9d3f';x.font='bold 16px Courier New';x.fillText('THE SQUAD',60,440);
+  x.fillStyle='#ece2d4';x.font='20px Georgia';
+  x.fillText('Product Lead:  '+state.names.lead,60,478);
+  x.fillText('Designer:  '+state.names.designer,60,510);
+  x.fillText('Critic / User Tester:  '+state.names.critic,60,542);
+  x.fillStyle='#ef9d3f';x.font='bold 16px Courier New';x.fillText('SKILL RATINGS',60,600);
+  x.fillStyle='#ece2d4';x.font='18px Georgia'; var yy=634;
+  SKILL_DEFS.forEach(function(sk){var v=state.skills[sk.key]||0,stars='';for(var n=1;n<=5;n++)stars+=(n<=v?'★':'☆');x.fillText(sk.name+'   '+stars,60,yy);yy+=30;});
+  x.fillStyle='#6f6456';x.font='13px Courier New';x.fillText('Swift AI - UX Investigations Unit',60,724);
+  var a=document.createElement('a');a.download='UX-Detective-Squad-Report.png';a.href=cv.toDataURL('image/png');a.click();
+}
+
+/* ============ INIT ============ */
+function initDust(){var d=document.getElementById('dust');for(var i=0;i<24;i++){var s=document.createElement('span');s.style.left=(Math.random()*100)+'%';s.style.bottom='-10px';s.style.animationDuration=(12+Math.random()*18)+'s';s.style.animationDelay=(Math.random()*12)+'s';s.style.opacity=Math.random()*.5+.2;d.appendChild(s);}}
+document.querySelectorAll('.name-in').forEach(function(inp){inp.addEventListener('input',checkRoles);});
+document.getElementById('promptInput').addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();runPrompt();}});
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeModal();});
+initDust(); hydrateRoles(); go(state.screen||1);
+</script>
+</body>
+</html>
